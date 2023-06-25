@@ -24,6 +24,9 @@ def J(f,args=(u,v)):# jacobian matrix
     X = Matrix([x1,x2])
     return f(x1,x2).jacobian(X)
 
+def jacobian_matrix(fc,x):# jacobian matrix
+    return fc(x).jacobian(Matrix(x))
+
 # surface definition end
 # %%
 def eta(n):# Minkowski metric
@@ -53,77 +56,80 @@ def g1(f):# metric
     j = J(f)
     return simplify((j.T @ j))
 
-def metric_from_jacobian(fc,args,__time_zero = True):
-    j = J(fc)
-    # a = b = c
-    # j.T is the transpose of j
-    return simplify((j.T @ flat_metric(args,time_zero = __time_zero) @ j))
+def metric_from_jacobian(fc,x,args,__time_zero = True):
+    jac = jacobian_matrix(fc,x)
+    # jac.T is the transpose of j
+    return simplify((jac.T @ flat_metric(args,time_zero = __time_zero) @ jac))
 
 _sign_of_ads3 = (1,2)
 _sign_of_ds3 = (2,1)
 # %%
-def scalar(metric_matrix, output=False):
-    x = [u,v]
+def scalar(metric_matrix, x, output=True):
     m_obj = MetricTensor(metric_matrix, x)
     # print('metric'); display(m_obj);
     Ric = RicciTensor.from_metric(m_obj)
-    print("Ricci tensor")
-    display(Ric.tensor().simplify())
     R = RicciScalar.from_riccitensor(Ric)
-    print("Ricci scalar")
-    display(R.simplify())
+    
     if output == True:
-        return Ric, R
-
-# %%
-def main(g,space="ads"):
-    x = [u,v]
-    if space == "ads":
-        print('anti-de Sitter space')
-        anti_de_Sitter = g(one_sheet_hyperboloid, _sign_of_ads3)
-        display(anti_de_Sitter)
-        ################
-        (scalar(anti_de_Sitter))
-        ################
+        print("Ricci tensor")
+        display(Ric.tensor().simplify())
         
-        m_obj = MetricTensor(anti_de_Sitter, x)
-        ch = ChristoffelSymbols.from_metric(m_obj)
-        display(ch.tensor())
-    if space == "ds":
-        print('de Sitter space = one-sheet hyperboloid')
-        de_Sitter = g(one_sheet_hyperboloid, _sign_of_ds3,__time_zero = false)
-        display(de_Sitter)
-        ################
-        Ric, R = (scalar(de_Sitter, output=True))
-        Ric, R = Ric.simplify(), R.simplify()
-        ################
-        G = Ric - tensorproduct(R / 2,de_Sitter)
+        print("Ricci scalar")
+        display(R.simplify())
+    
+    return Ric, R
+
+def einstein_tensor(metric, x, output=True):
+    ################
+    Ric, R = (scalar(metric, x, output=True))
+    Ric, R = Ric.simplify(), R.simplify()
+    ################
+    G = Ric - tensorproduct(R / 2,metric)
+    G = G.simplify()
+    if output == True:
+        print("Einstein tensor")
         display(G)
-        
+    
+    return (G)
 # %%
-if __name__ == '__main__':
-    print('one-sheet')
-    display(J(one_sheet_hyperboloid))
-    print('two-sheet')
-    display(J(two_sheet_hyperboloid))
+import sympy as sp
 
-    main(metric_from_jacobian, space="ds")
+def spherical_to_cartesian(n,radius = sp.Symbol("r"),subscript=0):
+    
+    # Define symbolic variables
+    # angle
+    
+    if subscript == 0:
+        spherical_vars = sp.symbols('theta0:%d' % (n-1))
+    if subscript == 1:
+        spherical_vars = sp.symbols('theta1:%d' % (n))
+    
+    # Create the coordinate mappings
+    cartesian_coords = []
+    polar_angle = spherical_vars[0]# theta_0
+    cartesian_coords.append(radius * sp.cos(polar_angle))
+    product_sin = sp.sin(polar_angle)
+    
+    for j in range(1, n - 1):
+        cartesian_coords.append(radius * sp.cos(spherical_vars[j]))
+        cartesian_coords[j] *= product_sin
+        product_sin *= sp.sin(spherical_vars[j])
+    
+    cartesian_coords.append(radius * product_sin)
+
+    print(cartesian_coords)
+    
+    return sp.Matrix(cartesian_coords)
 
 # %%
+def spherical_to_de_Sitter(n,radius = sp.Symbol("a")):
+    # Define symbolic variables
+    cartesian_coords_sphere = spherical_to_cartesian(n,radius=radius,subscript=1)
+    u = sp.Symbol("u")
+    cartesian_coords_sphere *= sp.cosh(u)
+    cartesian_coords_sphere = list(cartesian_coords_sphere)
+    # add the last coordinate
+    cartesian_coords_sphere.append(radius * sp.sinh(u))
+    return sp.Matrix(cartesian_coords_sphere)
 
-
-# %%
-
-# def main(g,f=two_sheet_hyperboloid):
-#     print('one-sheet')
-#     display(g(one_sheet_hyperboloid))
-#     print('two-sheet')
-#     display(g(two_sheet_hyperboloid))
-
-#     x = [u,v]
-#     m_obj = MetricTensor(g(f), x)
-#     ch = ChristoffelSymbols.from_metric(m_obj)
-#     display(ch.tensor())
-
-# %%
 
